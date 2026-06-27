@@ -63,3 +63,55 @@ resource "aws_s3_object" "db_settings_sql" {
 
   etag = filemd5("${path.module}/db-settings.sql")
 }
+
+## Bucket separado y de lectura pública para las imágenes de productos. Se mantiene aparte del bucket
+## de backups (db_storage) para no tener que tocar su política de acceso, que debe seguir 100% privada.
+resource "aws_s3_bucket" "product_images" {
+  bucket = var.images_bucket_name
+
+  tags = {
+    Purpose = "product-images"
+  }
+}
+
+## Solo se relaja block_public_policy/restrict_public_buckets (necesarios para que la bucket policy de
+## lectura pública surta efecto). Las ACLs públicas se mantienen bloqueadas: el acceso es vía policy.
+resource "aws_s3_bucket_public_access_block" "product_images" {
+  bucket = aws_s3_bucket.product_images.id
+
+  block_public_acls       = true
+  block_public_policy     = false
+  ignore_public_acls      = true
+  restrict_public_buckets = false
+}
+
+## Policy de lectura pública: cualquiera puede hacer GET de los objetos (son fotos de productos, no datos sensibles).
+resource "aws_s3_bucket_policy" "product_images_public_read" {
+  bucket = aws_s3_bucket.product_images.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadProductImages"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.product_images.arn}/*"
+      }
+    ]
+  })
+
+  depends_on = [aws_s3_bucket_public_access_block.product_images]
+}
+
+## Sube todas las imágenes de Imagenes/ al bucket público, una por cada archivo encontrado.
+resource "aws_s3_object" "product_images" {
+  for_each = fileset("${path.module}/Imagenes", "*")
+
+  bucket       = aws_s3_bucket.product_images.id
+  key          = each.value
+  source       = "${path.module}/Imagenes/${each.value}"
+  etag         = filemd5("${path.module}/Imagenes/${each.value}")
+  content_type = "image/jpeg"
+}
