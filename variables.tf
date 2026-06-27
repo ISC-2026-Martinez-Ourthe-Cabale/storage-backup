@@ -1,4 +1,5 @@
 variable "bucket_name" {
+  description = "Nombre del bucket S3 para almacenamiento de backups de la base de datos."
   type = string
 }
 

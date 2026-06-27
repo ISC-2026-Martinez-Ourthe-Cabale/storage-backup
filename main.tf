@@ -1,7 +1,9 @@
+## Recurso para crear el bucket S3 para almacenamiento de backups de la base de datos.
 resource "aws_s3_bucket" "db_storage" {
   bucket = var.bucket_name
 }
 
+## Recurso para bloquear el acceso público al bucket S3.
 resource "aws_s3_bucket_public_access_block" "db_storage" {
   bucket = aws_s3_bucket.db_storage.id
 
@@ -11,6 +13,7 @@ resource "aws_s3_bucket_public_access_block" "db_storage" {
   restrict_public_buckets = true
 }
 
+## Recurso para habilitar el cifrado del lado del servidor en el bucket S3.
 resource "aws_s3_bucket_server_side_encryption_configuration" "db_storage" {
   bucket = aws_s3_bucket.db_storage.id
 
@@ -21,14 +24,17 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "db_storage" {
   }
 }
 
+## Recurso para habilitar el versionado en el bucket S3.
 resource "aws_s3_bucket_versioning" "db_storage" {
   bucket = aws_s3_bucket.db_storage.id
 
+  ## Habilitar el versionado para mantener un historial de los objetos en el bucket.
   versioning_configuration {
     status = "Enabled"
   }
 }
 
+## Recurso para configurar la política de ciclo de vida del bucket S3, moviendo objetos a clases de almacenamiento más económicas
 resource "aws_s3_bucket_lifecycle_configuration" "db_storage" {
   bucket = aws_s3_bucket.db_storage.id
 
@@ -40,6 +46,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "db_storage" {
       prefix = "bkp-rds/"
     }
 
+    ## Configuración de transición de 30 días a STANDARD_IA y 90 días a GLACIER, y expiración de 365 días para los objetos en el bucket S3.
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -56,6 +63,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "db_storage" {
   }
 }
 
+## Recurso para subir el archivo db-settings.sql al bucket S3, utilizado para la configuración de la base de datos.
 resource "aws_s3_object" "db_settings_sql" {
   bucket = aws_s3_bucket.db_storage.id
   key    = "db-settings/db-settings.sql"
